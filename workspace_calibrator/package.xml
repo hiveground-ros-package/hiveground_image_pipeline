@@ -1,0 +1,20 @@
+<package>
+  <name>workspace_calibrator</name>
+  <version>1.0.0</version>
+  <description>
+     workspace_calibrator allows easy calibration workspace to an overhead camera with 4 markers.
+  </description>
+  <maintainer email="mahisorn.w@hiveground.com">Mahisorn Wongphati</maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <test_depend>rostest</test_depend>
+
+  <run_depend>image_geometry</run_depend>
+  <run_depend>opencv2</run_depend>
+  <run_depend>rospy</run_depend>
+  <run_depend>std_srvs</run_depend>
+  <run_depend>sensor_msgs</run_depend>
+
+</package>
