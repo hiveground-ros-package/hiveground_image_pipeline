@@ -1,0 +1,9 @@
+<launch>
+  <arg name="parent_frame"/>
+  <arg name="skeletons_topic"/>
+  
+  <node pkg="kinect_skeleton_interaction" type="skeleton_tf_publisher.py" name="skeleton_tf_publisher" output="screen">
+    <remap from="skeletons" to="$(arg skeletons_topic)" />
+    <param name="parent_frame" value="$(arg parent_frame)" />      
+  </node>
+</launch>

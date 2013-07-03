@@ -1,4 +1,4 @@
 image_pipeline
 ==============
 
-Various image processing tools/library
+Various 2D/3D image/data processing tools/library

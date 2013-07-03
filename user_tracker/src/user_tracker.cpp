@@ -49,6 +49,7 @@ xn::UserGenerator  g_UserGenerator;
 
 XnBool g_bNeedPose   = FALSE;
 XnChar g_strPose[20] = "";
+bool g_upper_only = false;
 
 void XN_CALLBACK_TYPE User_NewUser(xn::UserGenerator& generator, XnUserID nId, void* pCookie)
 {
@@ -156,13 +157,16 @@ void publishTransforms(const std::string& frame_id)
     publishTransform(user, XN_SKEL_RIGHT_ELBOW, frame_id, "right_elbow");
     publishTransform(user, XN_SKEL_RIGHT_HAND, frame_id, "right_hand");
 
-    publishTransform(user, XN_SKEL_LEFT_HIP, frame_id, "left_hip");
-    publishTransform(user, XN_SKEL_LEFT_KNEE, frame_id, "left_knee");
-    publishTransform(user, XN_SKEL_LEFT_FOOT, frame_id, "left_foot");
+    if(!g_upper_only)
+    {
+      publishTransform(user, XN_SKEL_LEFT_HIP, frame_id, "left_hip");
+      publishTransform(user, XN_SKEL_LEFT_KNEE, frame_id, "left_knee");
+      publishTransform(user, XN_SKEL_LEFT_FOOT, frame_id, "left_foot");
 
-    publishTransform(user, XN_SKEL_RIGHT_HIP, frame_id, "right_hip");
-    publishTransform(user, XN_SKEL_RIGHT_KNEE, frame_id, "right_knee");
-    publishTransform(user, XN_SKEL_RIGHT_FOOT, frame_id, "right_foot");
+      publishTransform(user, XN_SKEL_RIGHT_HIP, frame_id, "right_hip");
+      publishTransform(user, XN_SKEL_RIGHT_KNEE, frame_id, "right_knee");
+      publishTransform(user, XN_SKEL_RIGHT_FOOT, frame_id, "right_foot");
+    }
   }
 }
 
@@ -186,6 +190,10 @@ int main(int argc, char **argv) {
   pnh.getParam("camera_id", camera_id);
   ROS_INFO_STREAM("camera_id: " << camera_id);
 
+  pnh.getParam("track_upper_only", g_upper_only);
+  ROS_INFO_STREAM("track_upper_only: " << g_upper_only);
+
+
   XnStatus nRetVal = g_Context.Init();
   CHECK_RC(nRetVal, "Init");
 
@@ -198,7 +206,8 @@ int main(int argc, char **argv) {
   {
     xn::NodeInfo info = *nodeIt;
     const XnProductionNodeDescription& description = info.GetDescription();
-    ROS_INFO("depth node %d vendor %s name %s, instance %s", depth_node_count++, description.strVendor, description.strName, info.GetInstanceName());
+    ROS_DEBUG("depth node %d vendor %s name %s, instance %s", depth_node_count, description.strVendor, description.strName, info.GetInstanceName());
+    depth_node_count++;
   }
   ROS_INFO("Got %d depth node(s)", depth_node_count);
   if(depth_node_count > 2)
@@ -233,9 +242,10 @@ int main(int argc, char **argv) {
   {
     xn::NodeInfo info = *nodeIt;
     const XnProductionNodeDescription& description = info.GetDescription();
-    ROS_INFO("user node %d vendor %s name %s, instance %s", user_node_count++, description.strVendor, description.strName, info.GetInstanceName());
+    ROS_DEBUG("user node %d vendor %s name %s, instance %s", user_node_count, description.strVendor, description.strName, info.GetInstanceName());
+    user_node_count++;
   }
-  ROS_INFO("Got %d user node(s)", depth_node_count);
+  ROS_INFO("Got %d user node(s)", user_node_count);
 
   nodeIt = user_gen_list.Begin();
   if(depth_node_count == 2)
@@ -268,6 +278,7 @@ int main(int argc, char **argv) {
 
   if (g_UserGenerator.GetSkeletonCap().NeedPoseForCalibration())
   {
+    ROS_INFO("Pose PSI needed");
     g_bNeedPose = TRUE;
     if (!g_UserGenerator.IsCapabilitySupported(XN_CAPABILITY_POSE_DETECTION))
     {
@@ -281,7 +292,10 @@ int main(int argc, char **argv) {
     g_UserGenerator.GetSkeletonCap().GetCalibrationPose(g_strPose);
   }
 
-  g_UserGenerator.GetSkeletonCap().SetSkeletonProfile(XN_SKEL_PROFILE_ALL);
+  if(g_upper_only)
+    g_UserGenerator.GetSkeletonCap().SetSkeletonProfile(XN_SKEL_PROFILE_UPPER);
+  else
+    g_UserGenerator.GetSkeletonCap().SetSkeletonProfile(XN_SKEL_PROFILE_ALL);
 
   nRetVal = g_Context.StartGeneratingAll();
   CHECK_RC(nRetVal, "StartGenerating");
