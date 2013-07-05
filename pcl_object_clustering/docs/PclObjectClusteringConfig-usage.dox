@@ -1,0 +1,10 @@
+\subsubsection usage Usage
+\verbatim
+<node name="pcl_object_clustering" pkg="pcl_object_clustering" type="pcl_object_clustering">
+  <param name="sac_dist_threshold" type="double" value="0.03" />
+  <param name="ec_cluster_tolerance" type="double" value="0.05" />
+  <param name="ec_min_size" type="int" value="100" />
+  <param name="ec_max_size" type="int" value="2000" />
+</node>
+\endverbatim
+
