@@ -1,0 +1,26 @@
+<package>
+  <name>pcl_hand_arm_detector</name>
+  <version>0.1.0</version>
+  <description>pcl_hand_arm_detector</description>
+  <maintainer email="mahisorn.w@gmail.com">Mahisorn Wongphati</maintainer>
+
+  <license>BSD</license>
+
+  <!-- <url type="website">https://github.com/hiveground-ros-package/denso_rc7m_controller/wiki</url> -->
+  <!-- <url type="bugtracker"></url> -->
+
+  <author>Mahisorn Wongphati</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>roscpp</build_depend> 
+  <run_depend>roscpp</run_depend>
+  <build_depend>pcl_ros</build_depend> 
+  <run_depend>pcl_ros</run_depend>
+  <build_depend>sensor_msgs</build_depend> 
+  <run_depend>sensor_msgs</run_depend>
+  <build_depend>dynamic_reconfigure</build_depend> 
+  <run_depend>dynamic_reconfigure</run_depend>
+  <build_depend>cv_bridge</build_depend>
+  <run_depend>cv_bridge</run_depend>
+  
+</package>
