@@ -1,0 +1,9 @@
+\subsubsection parameters ROS parameters
+
+Reads and maintains the following parameters on the ROS server
+
+- \b "~sac_dist_threshold" : \b [double] SAC segmentation distance threshold min: 0.01, default: 0.03, max: 0.1
+- \b "~ec_cluster_tolerance" : \b [double] Euclidean cluster tolerance min: 0.01, default: 0.05, max: 0.1
+- \b "~ec_min_size" : \b [int] min cluster size min: 2, default: 100, max: 1000
+- \b "~ec_max_size" : \b [int] max cluster size min: 2, default: 2000, max: 4000
+

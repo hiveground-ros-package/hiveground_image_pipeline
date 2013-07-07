@@ -36,11 +36,15 @@
 #include <clustered_object_msgs/ClusteredObjects.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <Eigen/Eigen>
+#include <pcl_hand_arm_detector/kalman_filter3d.h>
+#include <pcl/kdtree/kdtree.h>
+#include <pcl/kdtree/kdtree_flann.h>
 
 using namespace visualization_msgs;
 
 ros::Subscriber g_clustered_objects_sub;
 ros::Publisher g_marker_array_pub;
+std::vector<KalmanFilter3d> hand_trackers_;
 
 typedef pcl::PointXYZ CLOUD_TYPE;
 
@@ -116,8 +120,16 @@ void callbackClusteredObject(const clustered_object_msgs::ClusteredObjectsPtr& m
 
     pushEigenMarker(msg->objects[i].mean, msg->objects[i].eigen_values, msg->objects[i].eigen_vectors, marker_id, marker_array, 0.1, msg->header.frame_id);
 
+    /*
     pcl::PointCloud<CLOUD_TYPE>::Ptr cloud(new pcl::PointCloud<CLOUD_TYPE>);
     pcl::fromROSMsg(msg->objects[i].cloud, *cloud);
+
+    pcl::KdTreeFLANN<CLOUD_TYPE> kdtree;
+    kdtree.setInputCloud(cloud);
+    CLOUD_TYPE search_point;
+    */
+
+
   }
 
   if((g_marker_array_pub.getNumSubscribers() != 0) && (!marker_array.markers.empty()))

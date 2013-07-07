@@ -40,7 +40,6 @@
 #include <pcl_object_clustering/pcl_object_clustering.h>
 #include <pcl_object_clustering/PclObjectClusteringConfig.h>
 
-#include <pcl_object_clustering/kalman_filter3d.h>
 #include <clustered_object_msgs/ClusteredObjects.h>
 
 #include <pcl/point_types.h>
@@ -134,7 +133,7 @@ void objectSegmentation(pcl::PointCloud<CLOUD_TYPE>::Ptr in,
   ec_extractor.setInputCloud(in);
   ec_extractor.extract(cluster_indices);
 
-  ROS_INFO_THROTTLE(1.0, "total object %d", (int)cluster_indices.size());
+  ROS_DEBUG_THROTTLE(1.0, "total object %d", (int)cluster_indices.size());
 
   for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin(); it != cluster_indices.end(); ++it)
   {

@@ -32,7 +32,7 @@
  */
 
 #include <ros/ros.h>
-#include <pcl_object_clustering/kalman_filter3d.h>
+#include <pcl_hand_arm_detector/kalman_filter3d.h>
 
 
 KalmanFilter3d::KalmanFilter3d()
@@ -48,10 +48,10 @@ KalmanFilter3d::~KalmanFilter3d()
 }
 
 void KalmanFilter3d::initialize(double dt,
-                                    const cv::Point3f& point,
-                                    double process_noise,
-                                    double measurement_noise,
-                                    double error_cov)
+                                const cv::Point3f& point,
+                                double process_noise,
+                                double measurement_noise,
+                                double error_cov)
 {
   filter_ = cv::KalmanFilter(6, 3, 0);
   filter_.statePost.at<float>(0) = point.x;
