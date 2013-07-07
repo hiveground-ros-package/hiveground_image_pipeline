@@ -32,7 +32,17 @@
 #include <ros/ros.h>
 #include <dynamic_reconfigure/server.h>
 
-#include <pcl/point_cloud.h>
+
+#include <sensor_msgs/PointCloud2.h>
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
+
+#include <pcl_object_clustering/pcl_object_clustering.h>
+#include <pcl_object_clustering/PclObjectClusteringConfig.h>
+
+#include <pcl_object_clustering/kalman_filter3d.h>
+#include <clustered_object_msgs/ClusteredObjects.h>
+
 #include <pcl/point_types.h>
 #include <pcl/io/pcd_io.h>
 
@@ -41,20 +51,12 @@
 #include <pcl/filters/extract_indices.h>
 #include <pcl/common/pca.h>
 
-#include <sensor_msgs/PointCloud2.h>
 
-#include <visualization_msgs/Marker.h>
-#include <visualization_msgs/MarkerArray.h>
 
-#include <pcl_object_clustering/pcl_object_clustering.h>
-#include <pcl_object_clustering/PclObjectClusteringConfig.h>
-
-#include <pcl_object_clustering/kalman_filter3d.h>
-
-#include <string.h>
 
 ros::Subscriber g_cloud_sub;
 ros::Publisher g_cloud_pub;
+ros::Publisher g_clustered_objects_pub;
 ros::Publisher g_marker_array_pub;
 double g_sac_distance_threshold;
 double g_ec_cluster_tolerance;
@@ -62,7 +64,7 @@ int g_ec_min_cluster_size;
 int g_ec_max_cluster_size;
 int g_marker_id = 0;
 
-#define CLOUD_TYPE pcl::PointXYZ
+typedef pcl::PointXYZ CLOUD_TYPE;
 
 using namespace std;
 using namespace visualization_msgs;
@@ -220,12 +222,19 @@ void callbackCloud(const sensor_msgs::PointCloud2ConstPtr& msg)
   std::vector<pcl::PointCloud<CLOUD_TYPE>::Ptr> clustered_clouds;
   objectSegmentation(cloud_objects, clustered_clouds);
 
+  clustered_object_msgs::ClusteredObjects clustered_objects;
 
   pcl::PCA<CLOUD_TYPE> pca;
   for(size_t i = 0; i < clustered_clouds.size(); i++)
   {
+    clustered_object_msgs::ClusteredObject object;
+    pcl::toROSMsg(*clustered_clouds[i], object.cloud);
+
+
+
+
     pca.setInputCloud(clustered_clouds[i]);
-    Eigen::Vector4f mean = pca.getMean();
+
 
     //if((mean.coeff(0) < area_x_min_) || (mean.coeff(0) > area_x_max_)) continue;
     //if((mean.coeff(1) < area_y_min_) || (mean.coeff(1) > area_y_max_)) continue;
@@ -234,10 +243,47 @@ void callbackCloud(const sensor_msgs::PointCloud2ConstPtr& msg)
     //ROS_INFO_STREAM("object " << i << " value:" << pca.getEigenValues());
     //ROS_INFO_STREAM("object " << i << " vector:" << pca.getEigenVectors());
     //ROS_INFO_STREAM("object " << i << " mean:" << pca.getMean());
-    Eigen::Vector3f eigen_value = pca.getEigenValues();
-    if(eigen_value.coeff(0) < (8*eigen_value.coeff(1))) continue;
+    //Eigen::Vector3f eigen_value = pca.getEigenValues();
+    //if(eigen_value.coeff(0) < (8*eigen_value.coeff(1))) continue;
+    Eigen::Vector4f mean = pca.getMean();
+    object.mean.resize(4);
+    object.mean[0] = mean.coeff(0);
+    object.mean[1] = mean.coeff(1);
+    object.mean[2] = mean.coeff(2);
+    object.mean[4] = mean.coeff(3);
+
+    Eigen::Vector3f eigen_values = pca.getEigenValues();
+    object.eigen_values.resize(3);
+    object.eigen_values[0] = eigen_values.coeff(0);
+    object.eigen_values[1] = eigen_values.coeff(1);
+    object.eigen_values[2] = eigen_values.coeff(2);
+
+    Eigen::Matrix3f ev = pca.getEigenVectors();
+    object.eigen_vectors.resize(9);
+    object.eigen_vectors[0] = ev.coeff(0, 0);
+    object.eigen_vectors[1] = ev.coeff(0, 1);
+    object.eigen_vectors[2] = ev.coeff(0, 2);
+
+    object.eigen_vectors[3] = ev.coeff(1, 0);
+    object.eigen_vectors[4] = ev.coeff(1, 1);
+    object.eigen_vectors[5] = ev.coeff(1, 2);
+
+    object.eigen_vectors[6] = ev.coeff(2, 0);
+    object.eigen_vectors[7] = ev.coeff(2, 1);
+    object.eigen_vectors[8] = ev.coeff(2, 2);
+
+
+
 
     pushEigenMarker(pca, marker_array, 0.1, msg->header.frame_id);
+    clustered_objects.objects.push_back(object);
+  }
+
+  if(g_clustered_objects_pub.getNumSubscribers() != 0 && clustered_objects.objects.size() != 0)
+  {
+    clustered_objects.header.stamp = ros::Time::now();
+    clustered_objects.header.frame_id = msg->header.frame_id;
+    g_clustered_objects_pub.publish(clustered_objects);
   }
 
   if((g_marker_array_pub.getNumSubscribers() != 0) && (!marker_array.markers.empty()))
@@ -278,6 +324,7 @@ int main(int argc, char** argv)
 
   g_cloud_sub = nh.subscribe("cloud_in", 1, callbackCloud);
   g_cloud_pub = nhp.advertise<sensor_msgs::PointCloud2>("cloud_output", 1);
+  g_clustered_objects_pub = nhp.advertise<clustered_object_msgs::ClusteredObjects>("clustered_objects", 1);
   g_marker_array_pub = nhp.advertise<MarkerArray>("tracked_objects", 128);
 
 
