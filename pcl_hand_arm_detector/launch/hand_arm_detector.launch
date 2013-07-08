@@ -1,5 +1,5 @@
 <launch>
   <node type="pcl_hand_arm_detector" pkg="pcl_hand_arm_detector" name="pcl_hand_arm_detector" output="screen">      
-    <remap from="clustered_objects" to="/pcl_object_clustering/clustered_objects" />    
+    <remap from="clustered_clouds" to="/pcl_object_clustering/clustered_clouds_output" />    
   </node>
 </launch>

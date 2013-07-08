@@ -31,42 +31,29 @@
  */
 #include <ros/ros.h>
 #include <dynamic_reconfigure/server.h>
-
-
 #include <sensor_msgs/PointCloud2.h>
-#include <visualization_msgs/Marker.h>
-#include <visualization_msgs/MarkerArray.h>
-
 #include <pcl_object_clustering/pcl_object_clustering.h>
 #include <pcl_object_clustering/PclObjectClusteringConfig.h>
-
-#include <clustered_object_msgs/ClusteredObjects.h>
-
 #include <pcl/point_types.h>
-#include <pcl/io/pcd_io.h>
-
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/common/pca.h>
-
-
+#include <pcl/io/io.h>
+#include <clustered_clouds_msgs/ClusteredClouds.h>
 
 
 ros::Subscriber g_cloud_sub;
 ros::Publisher g_cloud_pub;
-ros::Publisher g_clustered_objects_pub;
-ros::Publisher g_marker_array_pub;
+ros::Publisher g_clustered_clouds_pub;
+
 double g_sac_distance_threshold;
 double g_ec_cluster_tolerance;
 int g_ec_min_cluster_size;
 int g_ec_max_cluster_size;
 int g_marker_id = 0;
 
-typedef pcl::PointXYZ CLOUD_TYPE;
-
 using namespace std;
-using namespace visualization_msgs;
 
 void callbackConfig(pcl_object_clustering::PclObjectClusteringConfig &config, uint32_t level)
 {
@@ -81,14 +68,15 @@ void callbackConfig(pcl_object_clustering::PclObjectClusteringConfig &config, ui
   g_ec_max_cluster_size = config.ec_max_size;
 }
 
-void sacSegmentation(pcl::PointCloud<CLOUD_TYPE>::Ptr in,
-                       pcl::PointCloud<CLOUD_TYPE>::Ptr out_planar,
-                       pcl::PointCloud<CLOUD_TYPE>::Ptr out_objects)
+template <class T>
+void sacSegmentation(typename pcl::PointCloud<T>::Ptr in,
+                     typename pcl::PointCloud<T>::Ptr out_planar,
+                     typename pcl::PointCloud<T>::Ptr out_objects)
 {
   pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
   pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
 
-  pcl::SACSegmentation<CLOUD_TYPE> sac_segmentator;
+  pcl::SACSegmentation<T> sac_segmentator;
   sac_segmentator.setOptimizeCoefficients(true);
   sac_segmentator.setModelType(pcl::SACMODEL_PLANE);
   sac_segmentator.setMethodType(pcl::SAC_RANSAC);
@@ -107,7 +95,7 @@ void sacSegmentation(pcl::PointCloud<CLOUD_TYPE>::Ptr in,
     ROS_DEBUG("Indices size: %d", (int)inliers->indices.size ());
   }
 
-  pcl::ExtractIndices<CLOUD_TYPE> indices_extractor;
+  pcl::ExtractIndices<T> indices_extractor;
   indices_extractor.setNegative(false);
   indices_extractor.setInputCloud(in);
   indices_extractor.setIndices(inliers);
@@ -117,15 +105,16 @@ void sacSegmentation(pcl::PointCloud<CLOUD_TYPE>::Ptr in,
   indices_extractor.filter(*out_objects);
 }
 
-void objectSegmentation(pcl::PointCloud<CLOUD_TYPE>::Ptr in,
-                           std::vector<pcl::PointCloud<CLOUD_TYPE>::Ptr>& out)
+template <class T>
+void objectSegmentation(typename pcl::PointCloud<T>::Ptr in,
+                        std::vector<typename pcl::PointCloud<T>::Ptr>& out)
 {
-  pcl::search::KdTree<CLOUD_TYPE>::Ptr tree(new pcl::search::KdTree<CLOUD_TYPE>);
+  typename pcl::search::KdTree<T>::Ptr tree(new pcl::search::KdTree<T>);
   tree->setInputCloud(in);
   std::vector<pcl::PointIndices> cluster_indices;
 
 
-  pcl::EuclideanClusterExtraction<CLOUD_TYPE> ec_extractor;
+  pcl::EuclideanClusterExtraction<T> ec_extractor;
   ec_extractor.setClusterTolerance(g_ec_cluster_tolerance);
   ec_extractor.setMinClusterSize(g_ec_min_cluster_size);
   ec_extractor.setMaxClusterSize(g_ec_max_cluster_size);
@@ -137,7 +126,7 @@ void objectSegmentation(pcl::PointCloud<CLOUD_TYPE>::Ptr in,
 
   for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin(); it != cluster_indices.end(); ++it)
   {
-    pcl::PointCloud<CLOUD_TYPE>::Ptr cloud_cluster(new pcl::PointCloud<CLOUD_TYPE>);
+    typename pcl::PointCloud<T>::Ptr cloud_cluster(new pcl::PointCloud<T>);
     for (std::vector<int>::const_iterator pit = it->indices.begin(); pit != it->indices.end(); pit++)
     {
       cloud_cluster->points.push_back(in->points[*pit]);
@@ -149,167 +138,61 @@ void objectSegmentation(pcl::PointCloud<CLOUD_TYPE>::Ptr in,
   }
 }
 
-void pushEigenMarker(pcl::PCA<CLOUD_TYPE>& pca, MarkerArray& marker_array, double scale, const std::string& frame_id)
+template <class T>
+void processCloud(const sensor_msgs::PointCloud2ConstPtr& msg, clustered_clouds_msgs::ClusteredClouds& msg_out)
 {
-  Marker marker;
-  marker.lifetime = ros::Duration(0.1);
-  marker.header.frame_id = frame_id;
-  marker.ns = "cluster_eigen";
-  marker.type = Marker::ARROW;
-  marker.scale.y = 0.01;
-  marker.scale.z = 0.01;
-  marker.pose.position.x = pca.getMean().coeff(0);
-  marker.pose.position.y = pca.getMean().coeff(1);
-  marker.pose.position.z = pca.getMean().coeff(2);
+  typename pcl::PointCloud<T>::Ptr cloud(new pcl::PointCloud<T>);
+  pcl::fromROSMsg(*msg, *cloud);
+  typename pcl::PointCloud<T>::Ptr cloud_planar(new pcl::PointCloud<T>);
+  typename pcl::PointCloud<T>::Ptr cloud_objects(new pcl::PointCloud<T>);
+  sacSegmentation<T>(cloud, cloud_planar, cloud_objects);
 
-  Eigen::Quaternionf qx, qy, qz;
-  Eigen::Matrix3f ev = pca.getEigenVectors();
-  Eigen::Vector3f axis_x(ev.coeff(0, 0), ev.coeff(1, 0), ev.coeff(2, 0));
-  Eigen::Vector3f axis_y(ev.coeff(0, 1), ev.coeff(1, 1), ev.coeff(2, 1));
-  Eigen::Vector3f axis_z(ev.coeff(0, 2), ev.coeff(1, 2), ev.coeff(2, 2));
-  qx.setFromTwoVectors(Eigen::Vector3f(1, 0, 0), axis_x);
-  qy.setFromTwoVectors(Eigen::Vector3f(1, 0, 0), axis_y);
-  qz.setFromTwoVectors(Eigen::Vector3f(1, 0, 0), axis_z);
+  std::vector<typename pcl::PointCloud<T>::Ptr> clustered_clouds;
+  objectSegmentation<T>(cloud_objects, clustered_clouds);
 
-  marker.id = g_marker_id++;
-  marker.scale.x = pca.getEigenValues().coeff(0) * scale;
-  marker.pose.orientation.x = qx.x();
-  marker.pose.orientation.y = qx.y();
-  marker.pose.orientation.z = qx.z();
-  marker.pose.orientation.w = qx.w();
-  marker.color.b = 0.0;
-  marker.color.g = 0.0;
-  marker.color.r = 1.0;
-  marker.color.a = 1.0;
-  marker_array.markers.push_back(marker);
-
-  marker.id = g_marker_id++;
-  marker.scale.x = pca.getEigenValues().coeff(1) * 0.1;
-  marker.pose.orientation.x = qy.x();
-  marker.pose.orientation.y = qy.y();
-  marker.pose.orientation.z = qy.z();
-  marker.pose.orientation.w = qy.w();
-  marker.color.b = 0.0;
-  marker.color.g = 1.0;
-  marker.color.r = 0.0;
-  marker_array.markers.push_back(marker);
-
-  marker.id = g_marker_id++;
-  marker.scale.x = pca.getEigenValues().coeff(2) * 0.1;
-  marker.pose.orientation.x = qz.x();
-  marker.pose.orientation.y = qz.y();
-  marker.pose.orientation.z = qz.z();
-  marker.pose.orientation.w = qz.w();
-  marker.color.b = 1.0;
-  marker.color.g = 0.0;
-  marker.color.r = 0.0;
-  marker_array.markers.push_back(marker);
+  msg_out.clouds.resize(clustered_clouds.size());
+  for(size_t i = 0; i < clustered_clouds.size(); i++)
+  {
+    pcl::toROSMsg(*clustered_clouds[i], msg_out.clouds[i]);
+  }
 }
+
 
 void callbackCloud(const sensor_msgs::PointCloud2ConstPtr& msg)
 {
-  MarkerArray marker_array;
+  //MarkerArray marker_array;
   g_marker_id = 0;
 
-  pcl::PointCloud<CLOUD_TYPE>::Ptr cloud(new pcl::PointCloud<CLOUD_TYPE>);
-  pcl::fromROSMsg(*msg, *cloud);
-
-  pcl::PointCloud<CLOUD_TYPE>::Ptr cloud_planar(new pcl::PointCloud<CLOUD_TYPE>);
-  pcl::PointCloud<CLOUD_TYPE>::Ptr cloud_objects(new pcl::PointCloud<CLOUD_TYPE>);
-  sacSegmentation(cloud, cloud_planar, cloud_objects);
-
-  std::vector<pcl::PointCloud<CLOUD_TYPE>::Ptr> clustered_clouds;
-  objectSegmentation(cloud_objects, clustered_clouds);
-
-  clustered_object_msgs::ClusteredObjects clustered_objects;
-
-  pcl::PCA<CLOUD_TYPE> pca;
-  for(size_t i = 0; i < clustered_clouds.size(); i++)
+  bool cloud_with_rgb_data = false;
+  std::string field_list = pcl::getFieldsList (*msg);
+  ROS_DEBUG_STREAM_ONCE("Cloud type: " << field_list);
+  if(field_list.rfind("rgb") != std::string::npos)
   {
-    clustered_object_msgs::ClusteredObject object;
-    pcl::toROSMsg(*clustered_clouds[i], object.cloud);
-
-
-
-
-    pca.setInputCloud(clustered_clouds[i]);
-
-
-    //if((mean.coeff(0) < area_x_min_) || (mean.coeff(0) > area_x_max_)) continue;
-    //if((mean.coeff(1) < area_y_min_) || (mean.coeff(1) > area_y_max_)) continue;
-    //if((mean.coeff(2) < area_z_min_) || (mean.coeff(2) > area_z_max_)) continue;
-
-    //ROS_INFO_STREAM("object " << i << " value:" << pca.getEigenValues());
-    //ROS_INFO_STREAM("object " << i << " vector:" << pca.getEigenVectors());
-    //ROS_INFO_STREAM("object " << i << " mean:" << pca.getMean());
-    //Eigen::Vector3f eigen_value = pca.getEigenValues();
-    //if(eigen_value.coeff(0) < (8*eigen_value.coeff(1))) continue;
-    Eigen::Vector4f mean = pca.getMean();
-    object.mean.resize(4);
-    object.mean[0] = mean.coeff(0);
-    object.mean[1] = mean.coeff(1);
-    object.mean[2] = mean.coeff(2);
-    object.mean[4] = mean.coeff(3);
-
-    Eigen::Vector3f eigen_values = pca.getEigenValues();
-    object.eigen_values.resize(3);
-    object.eigen_values[0] = eigen_values.coeff(0);
-    object.eigen_values[1] = eigen_values.coeff(1);
-    object.eigen_values[2] = eigen_values.coeff(2);
-
-    Eigen::Matrix3f ev = pca.getEigenVectors();
-    object.eigen_vectors.resize(9);
-    object.eigen_vectors[0] = ev.coeff(0, 0);
-    object.eigen_vectors[1] = ev.coeff(0, 1);
-    object.eigen_vectors[2] = ev.coeff(0, 2);
-
-    object.eigen_vectors[3] = ev.coeff(1, 0);
-    object.eigen_vectors[4] = ev.coeff(1, 1);
-    object.eigen_vectors[5] = ev.coeff(1, 2);
-
-    object.eigen_vectors[6] = ev.coeff(2, 0);
-    object.eigen_vectors[7] = ev.coeff(2, 1);
-    object.eigen_vectors[8] = ev.coeff(2, 2);
-
-
-
-
-    pushEigenMarker(pca, marker_array, 0.1, msg->header.frame_id);
-    clustered_objects.objects.push_back(object);
+    cloud_with_rgb_data = true;
   }
 
-  if(g_clustered_objects_pub.getNumSubscribers() != 0 && clustered_objects.objects.size() != 0)
+  clustered_clouds_msgs::ClusteredClouds msg_out;
+  if(cloud_with_rgb_data)
   {
-    clustered_objects.header.stamp = ros::Time::now();
-    clustered_objects.header.frame_id = msg->header.frame_id;
-    g_clustered_objects_pub.publish(clustered_objects);
+    processCloud<pcl::PointXYZRGB>(msg, msg_out);
+  }
+  else
+  {
+    processCloud<pcl::PointXYZ>(msg, msg_out);
   }
 
-  if((g_marker_array_pub.getNumSubscribers() != 0) && (!marker_array.markers.empty()))
+  if(g_clustered_clouds_pub.getNumSubscribers() != 0 && msg_out.clouds.size() != 0)
   {
-    g_marker_array_pub.publish(marker_array);
-  }
-
-  if(g_cloud_pub.getNumSubscribers() != 0)
-  {
-    sensor_msgs::PointCloud2 output_cloud;
-    pcl::PointCloud<CLOUD_TYPE>::Ptr cloud(new pcl::PointCloud<CLOUD_TYPE>);
-    for(int i = 0; i < (int)clustered_clouds.size(); i++)
-    {
-      *cloud += *clustered_clouds[i];
-    }
-    pcl::toROSMsg(*cloud, output_cloud);
-
-    output_cloud.header.stamp = ros::Time::now();
-    output_cloud.header.frame_id = msg->header.frame_id;
-    g_cloud_pub.publish(output_cloud);
+    msg_out.header.stamp = ros::Time::now();
+    msg_out.header.frame_id = msg->header.frame_id;
+    g_clustered_clouds_pub.publish(msg_out);
   }
 }
 
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "pcl_object_clustering");
+  ros::init(argc, argv, "pcl_clustering");
 
   ros::NodeHandle nh;
   ros::NodeHandle nhp("~");
@@ -320,12 +203,9 @@ int main(int argc, char** argv)
   f = boost::bind(&callbackConfig, _1, _2);
   server.setCallback(f);
 
-
   g_cloud_sub = nh.subscribe("cloud_in", 1, callbackCloud);
   g_cloud_pub = nhp.advertise<sensor_msgs::PointCloud2>("cloud_output", 1);
-  g_clustered_objects_pub = nhp.advertise<clustered_object_msgs::ClusteredObjects>("clustered_objects", 1);
-  g_marker_array_pub = nhp.advertise<MarkerArray>("tracked_objects", 128);
-
+  g_clustered_clouds_pub = nhp.advertise<clustered_clouds_msgs::ClusteredClouds>("clustered_clouds_output", 1);
 
   ros::spin();
   return 0;

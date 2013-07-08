@@ -6,11 +6,6 @@
 
   <license>BSD</license>
 
-  <!-- <url type="website">https://github.com/hiveground-ros-package/denso_rc7m_controller/wiki</url> -->
-  <!-- <url type="bugtracker"></url> -->
-
-  <author>Mahisorn Wongphati</author>
-
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>roscpp</build_depend> 
   <run_depend>roscpp</run_depend>
@@ -22,7 +17,4 @@
   <run_depend>dynamic_reconfigure</run_depend>
   <build_depend>clustered_object_msgs</build_depend>
   <run_depend>clustered_object_msgs</run_depend>
-  <build_depend>interaction_msgs</build_depend>
-  <run_depend>interaction_msgs</run_depend>
-
 </package>

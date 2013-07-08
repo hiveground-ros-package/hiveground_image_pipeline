@@ -36,5 +36,4 @@
 
 
 
-
 #endif /* PCL_OBJECT_CLUSTERING_H_ */

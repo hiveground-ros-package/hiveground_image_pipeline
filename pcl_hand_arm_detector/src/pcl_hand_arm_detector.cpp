@@ -33,23 +33,30 @@
 #include <ros/ros.h>
 #include <pcl/point_types.h>
 #include <pcl/io/pcd_io.h>
-#include <clustered_object_msgs/ClusteredObjects.h>
+#include <clustered_clouds_msgs/ClusteredClouds.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <Eigen/Eigen>
 #include <pcl_hand_arm_detector/kalman_filter3d.h>
 #include <pcl/kdtree/kdtree.h>
 #include <pcl/kdtree/kdtree_flann.h>
+#include <pcl/common/pca.h>
+#include <pcl/io/io.h>
 
 using namespace visualization_msgs;
 
-ros::Subscriber g_clustered_objects_sub;
+ros::Subscriber g_clustered_clouds_sub;
 ros::Publisher g_marker_array_pub;
-std::vector<KalmanFilter3d> hand_trackers_;
+std::vector<KalmanFilter3d> g_hand_trackers;
+MarkerArray g_marker_array;
+int g_marker_id = 0;
 
-typedef pcl::PointXYZ CLOUD_TYPE;
 
-void pushEigenMarker(const std::vector<double>& mean, const std::vector<double>& eigen_values, const std::vector<double>& eigen_vectors, int& marker_id,
-                     MarkerArray& marker_array, double scale, const std::string& frame_id)
+template <class T>
+void pushEigenMarker(pcl::PCA<T>& pca,
+                     int& marker_id,
+                     MarkerArray& marker_array,
+                     double scale,
+                     const std::string& frame_id)
 {
   Marker marker;
   marker.lifetime = ros::Duration(0.1);
@@ -58,20 +65,21 @@ void pushEigenMarker(const std::vector<double>& mean, const std::vector<double>&
   marker.type = Marker::ARROW;
   marker.scale.y = 0.01;
   marker.scale.z = 0.01;
-  marker.pose.position.x = mean[0];
-  marker.pose.position.y = mean[1];
-  marker.pose.position.z = mean[2];
+  marker.pose.position.x = pca.getMean().coeff(0);
+  marker.pose.position.y = pca.getMean().coeff(1);
+  marker.pose.position.z = pca.getMean().coeff(2);
 
   Eigen::Quaternionf qx, qy, qz;
-  Eigen::Vector3f axis_x(eigen_vectors[0], eigen_vectors[3], eigen_vectors[6]);
-  Eigen::Vector3f axis_y(eigen_vectors[1], eigen_vectors[4], eigen_vectors[7]);
-  Eigen::Vector3f axis_z(eigen_vectors[2], eigen_vectors[5], eigen_vectors[8]);
+  Eigen::Matrix3f ev = pca.getEigenVectors();
+  Eigen::Vector3f axis_x(ev.coeff(0, 0), ev.coeff(1, 0), ev.coeff(2, 0));
+  Eigen::Vector3f axis_y(ev.coeff(0, 1), ev.coeff(1, 1), ev.coeff(2, 1));
+  Eigen::Vector3f axis_z(ev.coeff(0, 2), ev.coeff(1, 2), ev.coeff(2, 2));
   qx.setFromTwoVectors(Eigen::Vector3f(1, 0, 0), axis_x);
   qy.setFromTwoVectors(Eigen::Vector3f(1, 0, 0), axis_y);
   qz.setFromTwoVectors(Eigen::Vector3f(1, 0, 0), axis_z);
 
   marker.id = marker_id++;
-  marker.scale.x = eigen_values[0] * scale;
+  marker.scale.x = pca.getEigenValues().coeff(0) * scale;
   marker.pose.orientation.x = qx.x();
   marker.pose.orientation.y = qx.y();
   marker.pose.orientation.z = qx.z();
@@ -83,7 +91,7 @@ void pushEigenMarker(const std::vector<double>& mean, const std::vector<double>&
   marker_array.markers.push_back(marker);
 
   marker.id = marker_id++;
-  marker.scale.x = eigen_values[1] * 0.1;
+  marker.scale.x = pca.getEigenValues().coeff(1) * scale;
   marker.pose.orientation.x = qy.x();
   marker.pose.orientation.y = qy.y();
   marker.pose.orientation.z = qy.z();
@@ -94,7 +102,7 @@ void pushEigenMarker(const std::vector<double>& mean, const std::vector<double>&
   marker_array.markers.push_back(marker);
 
   marker.id = marker_id++;
-  marker.scale.x = eigen_values[2] * 0.1;
+  marker.scale.x = pca.getEigenValues().coeff(2) * scale;
   marker.pose.orientation.x = qz.x();
   marker.pose.orientation.y = qz.y();
   marker.pose.orientation.z = qz.z();
@@ -105,36 +113,47 @@ void pushEigenMarker(const std::vector<double>& mean, const std::vector<double>&
   marker_array.markers.push_back(marker);
 }
 
-void callbackClusteredObject(const clustered_object_msgs::ClusteredObjectsPtr& msg)
+template <class T>
+void checkCloud(const sensor_msgs::PointCloud2& cloud_msg, const std::string& frame_id)
 {
-  MarkerArray marker_array;
-  int marker_id = 0;
+  typename pcl::PointCloud<T>::Ptr cloud(new pcl::PointCloud<T>);
+  pcl::PCA<T> pca;
+  pcl::fromROSMsg(cloud_msg, *cloud);
+  pca.setInputCloud(cloud);
+  Eigen::Vector4f mean = pca.getMean();
 
-  for(size_t i = 0; i < msg->objects.size(); i++)
-  {      
-    if(msg->objects[i].eigen_values[0] < (8*msg->objects[i].eigen_values[1])) continue;
-
-    ROS_INFO("elongated object %lu %f %f %f %f", i,
-             msg->objects[i].mean[0], msg->objects[i].mean[1],
-             msg->objects[i].mean[2], msg->objects[i].mean[3]);
-
-    pushEigenMarker(msg->objects[i].mean, msg->objects[i].eigen_values, msg->objects[i].eigen_vectors, marker_id, marker_array, 0.1, msg->header.frame_id);
-
-    /*
-    pcl::PointCloud<CLOUD_TYPE>::Ptr cloud(new pcl::PointCloud<CLOUD_TYPE>);
-    pcl::fromROSMsg(msg->objects[i].cloud, *cloud);
-
-    pcl::KdTreeFLANN<CLOUD_TYPE> kdtree;
-    kdtree.setInputCloud(cloud);
-    CLOUD_TYPE search_point;
-    */
+  pushEigenMarker<T>(pca, g_marker_id, g_marker_array, 0.1, frame_id);
+}
 
 
+void callbackClusteredClouds(const clustered_clouds_msgs::ClusteredCloudsConstPtr& msg)
+{
+  g_marker_array.markers.clear();
+  g_marker_id = 0;
+
+  for(size_t i = 0; i < msg->clouds.size(); i++)
+  {
+    bool cloud_with_rgb_data = false;
+    std::string field_list = pcl::getFieldsList (msg->clouds[i]);
+    ROS_INFO_STREAM_ONCE("Cloud type: " << field_list);
+    if(field_list.rfind("rgb") != std::string::npos)
+    {
+      cloud_with_rgb_data = true;
+    }
+
+    if(cloud_with_rgb_data)
+    {
+      checkCloud<pcl::PointXYZRGB>(msg->clouds[i], msg->header.frame_id);
+    }
+    else
+    {
+      checkCloud<pcl::PointXYZ>(msg->clouds[i], msg->header.frame_id);
+    }
   }
 
-  if((g_marker_array_pub.getNumSubscribers() != 0) && (!marker_array.markers.empty()))
+  if((g_marker_array_pub.getNumSubscribers() != 0) && (!g_marker_array.markers.empty()))
   {
-    g_marker_array_pub.publish(marker_array);
+    g_marker_array_pub.publish(g_marker_array);
   }
 }
 
@@ -145,7 +164,7 @@ int main(int argc, char** argv)
   ros::NodeHandle nh;
   ros::NodeHandle nhp("~");
 
-  g_clustered_objects_sub = nh.subscribe("clustered_objects", 1, callbackClusteredObject);
+  g_clustered_clouds_sub = nh.subscribe("clustered_clouds", 1, callbackClusteredClouds);
   g_marker_array_pub = nhp.advertise<MarkerArray>("hand_arm_markers", 128);
   
   ros::spin();
