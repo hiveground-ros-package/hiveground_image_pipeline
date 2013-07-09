@@ -1,5 +1,18 @@
 <launch>
   <node type="pcl_hand_arm_detector" pkg="pcl_hand_arm_detector" name="pcl_hand_arm_detector" output="screen">      
     <remap from="clustered_clouds" to="/pcl_object_clustering/clustered_clouds_output" />    
+    <rosparam>
+      min_x: 0.3  
+      max_x: 0.65
+      min_y: -0.7
+      max_y: 0.7
+      min_z: 0.15  
+      max_z: 1.0
+      min_cluster_size: 200
+      max_cluster_size: 2000
+      min_eigen_value_ratio: 5.0
+      max_eigen_value_ratio: 40.0                    
+      hand_lenght: 0.15
+    </rosparam>
   </node>
 </launch>
