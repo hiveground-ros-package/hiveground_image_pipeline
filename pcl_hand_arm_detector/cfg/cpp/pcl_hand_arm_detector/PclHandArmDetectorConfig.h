@@ -263,17 +263,27 @@ class DEFAULT
         boost::any val;
         (*i)->getValue(config, val);
 
-        if("sac_dist_threshold"==(*i)->name){sac_dist_threshold = boost::any_cast<double>(val);}
-        if("ec_cluster_tolerance"==(*i)->name){ec_cluster_tolerance = boost::any_cast<double>(val);}
-        if("ec_min_size"==(*i)->name){ec_min_size = boost::any_cast<int>(val);}
-        if("ec_max_size"==(*i)->name){ec_max_size = boost::any_cast<int>(val);}
+        if("min_x"==(*i)->name){min_x = boost::any_cast<double>(val);}
+        if("max_x"==(*i)->name){max_x = boost::any_cast<double>(val);}
+        if("min_y"==(*i)->name){min_y = boost::any_cast<double>(val);}
+        if("max_y"==(*i)->name){max_y = boost::any_cast<double>(val);}
+        if("min_z"==(*i)->name){min_z = boost::any_cast<double>(val);}
+        if("max_z"==(*i)->name){max_z = boost::any_cast<double>(val);}
+        if("min_cluster_size"==(*i)->name){min_cluster_size = boost::any_cast<int>(val);}
+        if("max_cluster_size"==(*i)->name){max_cluster_size = boost::any_cast<int>(val);}
+        if("eigen_value_ratio"==(*i)->name){eigen_value_ratio = boost::any_cast<double>(val);}
       }
     }
 
-    double sac_dist_threshold;
-double ec_cluster_tolerance;
-int ec_min_size;
-int ec_max_size;
+    double min_x;
+double max_x;
+double min_y;
+double max_y;
+double min_z;
+double max_z;
+int min_cluster_size;
+int max_cluster_size;
+double eigen_value_ratio;
 
     bool state;
     std::string name;
@@ -284,13 +294,23 @@ int ec_max_size;
 
 
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      double sac_dist_threshold;
+      double min_x;
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      double ec_cluster_tolerance;
+      double max_x;
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      int ec_min_size;
+      double min_y;
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      int ec_max_size;
+      double max_y;
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      double min_z;
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      double max_z;
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      int min_cluster_size;
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      int max_cluster_size;
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      double eigen_value_ratio;
 //#line 255 "/opt/ros/groovy/share/dynamic_reconfigure/templates/ConfigType.h"
 
     bool __fromMessage__(dynamic_reconfigure::Config &msg)
@@ -427,45 +447,95 @@ int ec_max_size;
     {
 PclHandArmDetectorConfig::GroupDescription<PclHandArmDetectorConfig::DEFAULT, PclHandArmDetectorConfig> Default("Default", "", 0, 0, true, &PclHandArmDetectorConfig::groups);
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      __min__.sac_dist_threshold = 0.01;
+      __min__.min_x = -5.0;
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      __max__.sac_dist_threshold = 0.1;
+      __max__.min_x = 5.0;
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      __default__.sac_dist_threshold = 0.03;
+      __default__.min_x = -1.0;
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      Default.abstract_parameters.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<double>("sac_dist_threshold", "double", 0, "SAC segmentation distance threshold", "", &PclHandArmDetectorConfig::sac_dist_threshold)));
+      Default.abstract_parameters.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<double>("min_x", "double", 0, "detecting area x baundary", "", &PclHandArmDetectorConfig::min_x)));
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      __param_descriptions__.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<double>("sac_dist_threshold", "double", 0, "SAC segmentation distance threshold", "", &PclHandArmDetectorConfig::sac_dist_threshold)));
+      __param_descriptions__.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<double>("min_x", "double", 0, "detecting area x baundary", "", &PclHandArmDetectorConfig::min_x)));
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      __min__.ec_cluster_tolerance = 0.01;
+      __min__.max_x = -5.0;
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      __max__.ec_cluster_tolerance = 0.1;
+      __max__.max_x = 5.0;
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      __default__.ec_cluster_tolerance = 0.05;
+      __default__.max_x = 1.0;
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      Default.abstract_parameters.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<double>("ec_cluster_tolerance", "double", 0, "Euclidean cluster tolerance", "", &PclHandArmDetectorConfig::ec_cluster_tolerance)));
+      Default.abstract_parameters.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<double>("max_x", "double", 0, "detecting area x baundary", "", &PclHandArmDetectorConfig::max_x)));
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      __param_descriptions__.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<double>("ec_cluster_tolerance", "double", 0, "Euclidean cluster tolerance", "", &PclHandArmDetectorConfig::ec_cluster_tolerance)));
+      __param_descriptions__.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<double>("max_x", "double", 0, "detecting area x baundary", "", &PclHandArmDetectorConfig::max_x)));
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      __min__.ec_min_size = 2;
+      __min__.min_y = -5.0;
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      __max__.ec_min_size = 1000;
+      __max__.min_y = 5.0;
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      __default__.ec_min_size = 100;
+      __default__.min_y = -1.0;
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      Default.abstract_parameters.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<int>("ec_min_size", "int", 0, "min cluster size", "", &PclHandArmDetectorConfig::ec_min_size)));
+      Default.abstract_parameters.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<double>("min_y", "double", 0, "detecting area y baundary", "", &PclHandArmDetectorConfig::min_y)));
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      __param_descriptions__.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<int>("ec_min_size", "int", 0, "min cluster size", "", &PclHandArmDetectorConfig::ec_min_size)));
+      __param_descriptions__.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<double>("min_y", "double", 0, "detecting area y baundary", "", &PclHandArmDetectorConfig::min_y)));
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      __min__.ec_max_size = 2;
+      __min__.max_y = -5.0;
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      __max__.ec_max_size = 4000;
+      __max__.max_y = 5.0;
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      __default__.ec_max_size = 2000;
+      __default__.max_y = 1.0;
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      Default.abstract_parameters.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<int>("ec_max_size", "int", 0, "max cluster size", "", &PclHandArmDetectorConfig::ec_max_size)));
+      Default.abstract_parameters.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<double>("max_y", "double", 0, "detecting area y baundary", "", &PclHandArmDetectorConfig::max_y)));
 //#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
-      __param_descriptions__.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<int>("ec_max_size", "int", 0, "max cluster size", "", &PclHandArmDetectorConfig::ec_max_size)));
+      __param_descriptions__.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<double>("max_y", "double", 0, "detecting area y baundary", "", &PclHandArmDetectorConfig::max_y)));
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      __min__.min_z = -5.0;
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      __max__.min_z = 5.0;
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      __default__.min_z = -1.0;
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      Default.abstract_parameters.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<double>("min_z", "double", 0, "detecting area z baundary", "", &PclHandArmDetectorConfig::min_z)));
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      __param_descriptions__.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<double>("min_z", "double", 0, "detecting area z baundary", "", &PclHandArmDetectorConfig::min_z)));
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      __min__.max_z = -5.0;
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      __max__.max_z = 5.0;
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      __default__.max_z = 1.0;
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      Default.abstract_parameters.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<double>("max_z", "double", 0, "detecting area z baundary", "", &PclHandArmDetectorConfig::max_z)));
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      __param_descriptions__.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<double>("max_z", "double", 0, "detecting area z baundary", "", &PclHandArmDetectorConfig::max_z)));
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      __min__.min_cluster_size = 2;
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      __max__.min_cluster_size = 4000;
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      __default__.min_cluster_size = 100;
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      Default.abstract_parameters.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<int>("min_cluster_size", "int", 0, "minimum cluster size", "", &PclHandArmDetectorConfig::min_cluster_size)));
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      __param_descriptions__.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<int>("min_cluster_size", "int", 0, "minimum cluster size", "", &PclHandArmDetectorConfig::min_cluster_size)));
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      __min__.max_cluster_size = 2;
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      __max__.max_cluster_size = 4000;
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      __default__.max_cluster_size = 2000;
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      Default.abstract_parameters.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<int>("max_cluster_size", "int", 0, "maximum cluster size", "", &PclHandArmDetectorConfig::max_cluster_size)));
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      __param_descriptions__.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<int>("max_cluster_size", "int", 0, "maximum cluster size", "", &PclHandArmDetectorConfig::max_cluster_size)));
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      __min__.eigen_value_ratio = 0.1;
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      __max__.eigen_value_ratio = 20.0;
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      __default__.eigen_value_ratio = 8.0;
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      Default.abstract_parameters.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<double>("eigen_value_ratio", "double", 0, "ratio between primary and secondy axes", "", &PclHandArmDetectorConfig::eigen_value_ratio)));
+//#line 259 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
+      __param_descriptions__.push_back(PclHandArmDetectorConfig::AbstractParamDescriptionConstPtr(new PclHandArmDetectorConfig::ParamDescription<double>("eigen_value_ratio", "double", 0, "ratio between primary and secondy axes", "", &PclHandArmDetectorConfig::eigen_value_ratio)));
 //#line 233 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"
       Default.convertParams();
 //#line 233 "/opt/ros/groovy/lib/python2.7/dist-packages/dynamic_reconfigure/parameter_generator.py"

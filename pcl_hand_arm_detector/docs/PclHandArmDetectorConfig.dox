@@ -2,8 +2,13 @@
 
 Reads and maintains the following parameters on the ROS server
 
-- \b "~sac_dist_threshold" : \b [double] SAC segmentation distance threshold min: 0.01, default: 0.03, max: 0.1
-- \b "~ec_cluster_tolerance" : \b [double] Euclidean cluster tolerance min: 0.01, default: 0.05, max: 0.1
-- \b "~ec_min_size" : \b [int] min cluster size min: 2, default: 100, max: 1000
-- \b "~ec_max_size" : \b [int] max cluster size min: 2, default: 2000, max: 4000
+- \b "~min_x" : \b [double] detecting area x baundary min: -5.0, default: -1.0, max: 5.0
+- \b "~max_x" : \b [double] detecting area x baundary min: -5.0, default: 1.0, max: 5.0
+- \b "~min_y" : \b [double] detecting area y baundary min: -5.0, default: -1.0, max: 5.0
+- \b "~max_y" : \b [double] detecting area y baundary min: -5.0, default: 1.0, max: 5.0
+- \b "~min_z" : \b [double] detecting area z baundary min: -5.0, default: -1.0, max: 5.0
+- \b "~max_z" : \b [double] detecting area z baundary min: -5.0, default: 1.0, max: 5.0
+- \b "~min_cluster_size" : \b [int] minimum cluster size min: 2, default: 100, max: 4000
+- \b "~max_cluster_size" : \b [int] maximum cluster size min: 2, default: 2000, max: 4000
+- \b "~eigen_value_ratio" : \b [double] ratio between primary and secondy axes min: 0.1, default: 8.0, max: 20.0
 

@@ -1,10 +1,15 @@
 \subsubsection usage Usage
 \verbatim
 <node name="pcl_hand_arm_detector" pkg="pcl_hand_arm_detector" type="pcl_hand_arm_detector">
-  <param name="sac_dist_threshold" type="double" value="0.03" />
-  <param name="ec_cluster_tolerance" type="double" value="0.05" />
-  <param name="ec_min_size" type="int" value="100" />
-  <param name="ec_max_size" type="int" value="2000" />
+  <param name="min_x" type="double" value="-1.0" />
+  <param name="max_x" type="double" value="1.0" />
+  <param name="min_y" type="double" value="-1.0" />
+  <param name="max_y" type="double" value="1.0" />
+  <param name="min_z" type="double" value="-1.0" />
+  <param name="max_z" type="double" value="1.0" />
+  <param name="min_cluster_size" type="int" value="100" />
+  <param name="max_cluster_size" type="int" value="2000" />
+  <param name="eigen_value_ratio" type="double" value="8.0" />
 </node>
 \endverbatim
 

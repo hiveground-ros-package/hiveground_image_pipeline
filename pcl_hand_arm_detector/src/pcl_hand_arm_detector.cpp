@@ -41,6 +41,9 @@
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/common/pca.h>
 #include <pcl/io/io.h>
+#include <dynamic_reconfigure/server.h>
+#include <pcl_hand_arm_detector/PclHandArmDetectorConfig.h>
+#include <boost/thread.hpp>
 
 using namespace visualization_msgs;
 
@@ -49,7 +52,22 @@ ros::Publisher g_marker_array_pub;
 std::vector<KalmanFilter3d> g_hand_trackers;
 MarkerArray g_marker_array;
 int g_marker_id = 0;
+pcl_hand_arm_detector::PclHandArmDetectorConfig g_config;
+boost::mutex mutex_config;
 
+
+void callbackConfig(pcl_hand_arm_detector::PclHandArmDetectorConfig &config, uint32_t level)
+{
+  mutex_config.lock();
+  g_config = config;
+  mutex_config.unlock();
+
+
+  //g_sac_distance_threshold = config.sac_dist_threshold;
+  //g_ec_cluster_tolerance = config.ec_cluster_tolerance;
+  //g_ec_min_cluster_size = config.ec_min_size;
+  //g_ec_max_cluster_size = config.ec_max_size;
+}
 
 template <class T>
 void pushEigenMarker(pcl::PCA<T>& pca,
@@ -115,14 +133,27 @@ void pushEigenMarker(pcl::PCA<T>& pca,
 
 template <class T>
 void checkCloud(const sensor_msgs::PointCloud2& cloud_msg, const std::string& frame_id)
-{
+{  
   typename pcl::PointCloud<T>::Ptr cloud(new pcl::PointCloud<T>);
-  pcl::PCA<T> pca;
   pcl::fromROSMsg(cloud_msg, *cloud);
+
+  if((cloud->points.size() < g_config.min_cluster_size) || (cloud->points.size() > g_config.max_cluster_size)) return;
+
+  pcl::PCA<T> pca;
   pca.setInputCloud(cloud);
   Eigen::Vector4f mean = pca.getMean();
 
+  if((mean.coeff(0) < g_config.min_x) || (mean.coeff(0) > g_config.max_x)) return;
+  if((mean.coeff(1) < g_config.min_y) || (mean.coeff(1) > g_config.max_y)) return;
+  if((mean.coeff(2) < g_config.min_z) || (mean.coeff(2) > g_config.max_z)) return;
+
+  Eigen::Vector3f eigen_value = pca.getEigenValues();
+  if(eigen_value.coeff(0) < (g_config.eigen_value_ratio*eigen_value.coeff(1))) return;
+
   pushEigenMarker<T>(pca, g_marker_id, g_marker_array, 0.1, frame_id);
+
+
+
 }
 
 
@@ -131,6 +162,7 @@ void callbackClusteredClouds(const clustered_clouds_msgs::ClusteredCloudsConstPt
   g_marker_array.markers.clear();
   g_marker_id = 0;
 
+  mutex_config.lock();
   for(size_t i = 0; i < msg->clouds.size(); i++)
   {
     bool cloud_with_rgb_data = false;
@@ -150,6 +182,7 @@ void callbackClusteredClouds(const clustered_clouds_msgs::ClusteredCloudsConstPt
       checkCloud<pcl::PointXYZ>(msg->clouds[i], msg->header.frame_id);
     }
   }
+  mutex_config.unlock();
 
   if((g_marker_array_pub.getNumSubscribers() != 0) && (!g_marker_array.markers.empty()))
   {
@@ -163,6 +196,12 @@ int main(int argc, char** argv)
 
   ros::NodeHandle nh;
   ros::NodeHandle nhp("~");
+
+  dynamic_reconfigure::Server<pcl_hand_arm_detector::PclHandArmDetectorConfig> server;
+  dynamic_reconfigure::Server<pcl_hand_arm_detector::PclHandArmDetectorConfig>::CallbackType f;
+
+  f = boost::bind(&callbackConfig, _1, _2);
+  server.setCallback(f);
 
   g_clustered_clouds_sub = nh.subscribe("clustered_clouds", 1, callbackClusteredClouds);
   g_marker_array_pub = nhp.advertise<MarkerArray>("hand_arm_markers", 128);

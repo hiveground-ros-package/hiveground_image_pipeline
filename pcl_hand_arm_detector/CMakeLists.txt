@@ -3,6 +3,7 @@ project(pcl_hand_arm_detector)
 
 find_package(catkin REQUIRED COMPONENTS roscpp pcl_ros sensor_msgs dynamic_reconfigure cv_bridge clustered_object_msgs)
 find_package(OpenCV REQUIRED)
+find_package(Boost REQUIRED)
 
 #add dynamic reconfigure api
 generate_dynamic_reconfigure_options(
@@ -40,6 +41,7 @@ add_executable(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
   kalman_filter3d
 )
 
