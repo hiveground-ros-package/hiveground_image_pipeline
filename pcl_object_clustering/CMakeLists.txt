@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(pcl_object_clustering)
 
-find_package(catkin REQUIRED COMPONENTS roscpp pcl_ros sensor_msgs dynamic_reconfigure clustered_object_msgs)
+find_package(catkin REQUIRED COMPONENTS roscpp pcl_ros sensor_msgs dynamic_reconfigure clustered_clouds_msgs)
 
 #add dynamic reconfigure api
 generate_dynamic_reconfigure_options(

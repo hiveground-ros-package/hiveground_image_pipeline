@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(pcl_hand_arm_detector)
 
-find_package(catkin REQUIRED COMPONENTS roscpp pcl_ros sensor_msgs dynamic_reconfigure cv_bridge clustered_object_msgs)
+find_package(catkin REQUIRED COMPONENTS roscpp pcl_ros sensor_msgs dynamic_reconfigure cv_bridge clustered_clouds_msgs interaction_msgs)
 find_package(OpenCV REQUIRED)
 find_package(Boost REQUIRED)
 

@@ -37,9 +37,11 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <Eigen/Eigen>
 #include <boost/thread.hpp>
+#include <tf/transform_broadcaster.h>
 #include <tf/tf.h>
+#include <interaction_msgs/Arms.h>
 
-
+#include <sstream>
 
 #include <pcl_hand_arm_detector/kalman_filter3d.h>
 #include <pcl/kdtree/kdtree.h>
@@ -51,11 +53,14 @@
 #include <dynamic_reconfigure/server.h>
 #include <pcl_hand_arm_detector/PclHandArmDetectorConfig.h>
 
+#define PUBLISH_TRANSFORM 0
+
 using namespace visualization_msgs;
 
 ros::Subscriber g_clustered_clouds_sub;
 ros::Publisher g_marker_array_pub;
 ros::Publisher g_cloud_pub;
+ros::Publisher g_arms_pub;
 
 static const int HAND_HISTORY_SIZE = 30;
 std::vector<KalmanFilter3d> g_hand_trackers;
@@ -180,6 +185,7 @@ bool checkCloud(const sensor_msgs::PointCloud2& cloud_msg,
                 //typename pcl::PointCloud<T>::Ptr finger_cloud,
                 const std::string& frame_id,
                 tf::Vector3& hand_position,
+                tf::Vector3& arm_position,
                 tf::Vector3& arm_direction)
 {  
   typename pcl::PointCloud<T>::Ptr cloud(new pcl::PointCloud<T>);
@@ -211,6 +217,15 @@ bool checkCloud(const sensor_msgs::PointCloud2& cloud_msg,
   search_point.y = main_axis.coeff(1);
   search_point.z = main_axis.coeff(2);
   main_axis.normalize();
+
+
+  arm_position.setX(mean.coeff(0));
+  arm_position.setY(mean.coeff(1));
+  arm_position.setZ(mean.coeff(2));
+  arm_direction.setX(main_axis.coeff(0));
+  arm_direction.setY(main_axis.coeff(1));
+  arm_direction.setZ(main_axis.coeff(2));
+
 
   //find hand
   pcl::KdTreeFLANN<T> kdtree;
@@ -259,9 +274,6 @@ bool checkCloud(const sensor_msgs::PointCloud2& cloud_msg,
     hand_position.setX(centroid.coeff(0));
     hand_position.setY(centroid.coeff(1));
     hand_position.setZ(centroid.coeff(2));
-    arm_direction.setX(main_axis.coeff(0));
-    arm_direction.setY(main_axis.coeff(1));
-    arm_direction.setZ(main_axis.coeff(2));
 
 #if 0
     //fingers
@@ -302,6 +314,10 @@ bool checkCloud(const sensor_msgs::PointCloud2& cloud_msg,
 #endif
 
   }
+  else
+  {
+    return false;
+  }
 
   if(g_marker_array_pub.getNumSubscribers() != 0)
     pushEigenMarker<T>(pca, g_marker_id, g_marker_array, 0.1, frame_id);
@@ -332,6 +348,10 @@ int closestHand(const tf::Vector3& point, const std::vector<tf::Vector3>& hand_p
 
 void callbackClusteredClouds(const clustered_clouds_msgs::ClusteredCloudsConstPtr& msg)
 {
+#if PUBLISH_TRANSFORM
+  static tf::TransformBroadcaster tf_br;
+#endif
+
   g_marker_array.markers.clear();
   g_marker_id = 0;
 
@@ -353,12 +373,13 @@ void callbackClusteredClouds(const clustered_clouds_msgs::ClusteredCloudsConstPt
     {
       pcl::PointCloud<pcl::PointXYZRGB>::Ptr hand_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
       //pcl::PointCloud<pcl::PointXYZRGB>::Ptr finger_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
-      tf::Vector3 hand_position, arm_direction;
+      tf::Vector3 hand_position, arm_position, arm_direction;
       bool found = checkCloud<pcl::PointXYZRGB>(msg->clouds[i],
                                                 hand_cloud,
                                                 //finger_cloud,
                                                 msg->header.frame_id,
                                                 hand_position,
+                                                arm_position,
                                                 arm_direction);
       if(found)
       {
@@ -392,16 +413,22 @@ void callbackClusteredClouds(const clustered_clouds_msgs::ClusteredCloudsConstPt
   geometry_msgs::Point marker_point;
   cv::Point3f measurement;
   cv::Mat result;
-  int state;
+  int state;  
+  interaction_msgs::Arms arms_msg;
   for (size_t i = 0; i < g_hand_trackers.size(); i++)
   {
     if (i + 1 <= hand_positions.size())
     {
       g_hand_trackers[i].predict(result);
       //ROS_INFO_STREAM("[" << i << "] predicted: " << result);
-      marker_point.x = result.at<float>(0);
-      marker_point.y = result.at<float>(1);
-      marker_point.z = result.at<float>(2);
+
+      //prepare markers if needed
+      if(g_marker_array_pub.getNumSubscribers() != 0)
+      {
+        marker_point.x = result.at<float>(0);
+        marker_point.y = result.at<float>(1);
+        marker_point.z = result.at<float>(2);
+      }
 
       tf::Vector3 point1(result.at<float>(0), result.at<float>(1), result.at<float>(2));
       int index = closestHand(point1, hand_positions);
@@ -427,25 +454,50 @@ void callbackClusteredClouds(const clustered_clouds_msgs::ClusteredCloudsConstPt
           //ROS_INFO_STREAM("[" << i << "] point: " << point);
           g_hand_trackers[i].initialize(1.0 / 30.0, point, 1e-2, 1e-1, 1e-1);
           break;
-      }
+      }                  
 
       if ((state == KalmanFilter3d::TRACK) || (state == KalmanFilter3d::START))
       {
         g_hand_trackers[i].update(measurement, result);
 
-        marker_point.x = result.at<float>(0);
-        marker_point.y = result.at<float>(1);
-        marker_point.z = result.at<float>(2);
-        g_hand_histories[i].push_back(marker_point);
+        interaction_msgs::Arm arm_msg;
+        arm_msg.arm_id = i;
+        arm_msg.hand.translation.x = result.at<float>(0);
+        arm_msg.hand.translation.y = result.at<float>(1);
+        arm_msg.hand.translation.z = result.at<float>(2);
+        arm_msg.hand.rotation.w = 1;
+        arms_msg.arms.push_back(arm_msg);
 
-        if (g_hand_histories[i].size() > HAND_HISTORY_SIZE)
+
+#if PUBLISH_TRANSFORM
+        tf::Transform hand_tf;
+        hand_tf.setOrigin(tf::Vector3(result.at<float>(0), result.at<float>(1), result.at<float>(2)));
+        hand_tf.setRotation(tf::Quaternion(0, 0, 0, 1));
+
+        std::stringstream ss;
+        ss << "hand" << i;
+
+        tf_br.sendTransform(tf::StampedTransform(hand_tf, ros::Time::now(), msg->header.frame_id, ss.str()));
+#endif
+
+        //prepare markers if needed
+        if(g_marker_array_pub.getNumSubscribers() != 0)
         {
-          g_hand_histories[i].pop_front();
+          marker_point.x = result.at<float>(0);
+          marker_point.y = result.at<float>(1);
+          marker_point.z = result.at<float>(2);
+          g_hand_histories[i].push_back(marker_point);
+
+          if (g_hand_histories[i].size() > HAND_HISTORY_SIZE)
+          {
+            g_hand_histories[i].pop_front();
+          }
         }
       }
     }
   }
 
+  //prepare markers if needed
   if(g_marker_array_pub.getNumSubscribers() != 0)
   {
     Marker marker;
@@ -483,6 +535,12 @@ void callbackClusteredClouds(const clustered_clouds_msgs::ClusteredCloudsConstPt
   }
 
 
+  if((g_arms_pub.getNumSubscribers() != 0) && arms_msg.arms.size() != 0)
+  {
+    arms_msg.header.stamp = ros::Time::now();
+    arms_msg.header.frame_id = msg->header.frame_id;
+    g_arms_pub.publish(arms_msg);
+  }
 
   if(g_cloud_pub.getNumSubscribers() != 0)
   {
@@ -515,6 +573,7 @@ int main(int argc, char** argv)
   g_clustered_clouds_sub = nh.subscribe("clustered_clouds", 1, callbackClusteredClouds);
   g_marker_array_pub = nhp.advertise<MarkerArray>("hand_arm_markers", 128);
   g_cloud_pub = nhp.advertise<sensor_msgs::PointCloud2>("cloud_output", 1);
+  g_arms_pub = nhp.advertise<interaction_msgs::Arms>("arms_output", 1);
   
   ros::spin();
   return 0;

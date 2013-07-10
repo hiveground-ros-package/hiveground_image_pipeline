@@ -48,7 +48,7 @@ class SkeletonTFPublisher():
                                
     def publishTransform(self, id, position, child, parent, time):                      
         #convert Kinect SDK frame to depth_frame
-        translation = (position.translation.z, position.translation.x, position.translation.y)
+        translation = (position.translation.x, position.translation.y, position.translation.z)
         self.tf_br.sendTransform(translation, (0, 0, 0, 1), time, "{}_{}".format(child, id), parent)
         pass
             
