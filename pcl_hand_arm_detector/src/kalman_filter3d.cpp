@@ -34,12 +34,16 @@
 #include <ros/ros.h>
 #include <pcl_hand_arm_detector/kalman_filter3d.h>
 
+int KalmanFilter3d::id_count_ = 0;
 
 KalmanFilter3d::KalmanFilter3d()
-  : predict_count_(0), update_count_(0),
-    current_state_(START)
+  : predict_count_(0),
+    update_count_(0),
+    current_state_(START),
+    update_before_track_(5),
+    predict_before_die_(10)
 {
-
+  id_ = id_count_++;
 }
 
 KalmanFilter3d::~KalmanFilter3d()
@@ -51,7 +55,9 @@ void KalmanFilter3d::initialize(double dt,
                                 const cv::Point3f& point,
                                 double process_noise,
                                 double measurement_noise,
-                                double error_cov)
+                                double error_cov,
+                                int update_before_track,
+                                int predict_before_die)
 {
   filter_ = cv::KalmanFilter(6, 3, 0);
   filter_.statePost.at<float>(0) = point.x;
@@ -74,12 +80,15 @@ void KalmanFilter3d::initialize(double dt,
   predict_count_ = 0;
   update_count_ = 0;
   current_state_ = START;
+  update_before_track_ = update_before_track;
+  predict_before_die_ = predict_before_die;
 }
 
 void KalmanFilter3d::predict(cv::Mat& result)
 {
   result = filter_.predict();
-  predict_count_++;
+  last_result_ = result;
+  predict_count_++;  
 }
 
 void KalmanFilter3d::update(const cv::Point3f& measurement, cv::Mat& result)
@@ -90,6 +99,7 @@ void KalmanFilter3d::update(const cv::Point3f& measurement, cv::Mat& result)
   z(1) = measurement.y;
   z(2) = measurement.z;
   result = filter_.correct(z);
+  last_result_ = result;
   update_count_++;
 }
 
@@ -98,13 +108,14 @@ int KalmanFilter3d::updateState()
   switch(current_state_)
   {
     case START:
+      ROS_DEBUG("START %d %d %d", id_, predict_count_, update_count_);
       if(predict_count_ > update_count_)
       {
         current_state_ = DIE;
       }
       else if(predict_count_ == update_count_)
       {
-        if(update_count_ > 5)
+        if(update_count_ > update_before_track_)
         {
           current_state_ = TRACK;
         }
@@ -115,13 +126,15 @@ int KalmanFilter3d::updateState()
       }
       break;
     case TRACK:
+      ROS_DEBUG("TRACK %d %d %d", id_, predict_count_, update_count_);
       if(predict_count_ > update_count_)
       {
         current_state_ = LOST;
       }
       else if(predict_count_ == update_count_)
       {
-          current_state_ = TRACK;
+        current_state_ = TRACK;
+        predict_count_ = update_count_ = 0;
       }
       else
       {
@@ -129,7 +142,8 @@ int KalmanFilter3d::updateState()
       }
       break;
     case LOST:
-      if((predict_count_ - update_count_) > 30)
+      ROS_DEBUG("LOST %d %d %d", id_, predict_count_, update_count_);
+      if((predict_count_ - update_count_) > predict_before_die_)
       {
         predict_count_ = 0;
         update_count_ = 0;
@@ -137,6 +151,7 @@ int KalmanFilter3d::updateState()
       }
       break;
     case DIE:
+      ROS_DEBUG("DIE %d %d %d", id_, predict_count_, update_count_);
       if(update_count_ > 0)
       {
         current_state_ = START;

@@ -53,7 +53,7 @@
 #include <dynamic_reconfigure/server.h>
 #include <pcl_hand_arm_detector/PclHandArmDetectorConfig.h>
 
-#define PUBLISH_TRANSFORM 0
+#define PUBLISH_TRANSFORM 1
 
 using namespace visualization_msgs;
 
@@ -211,20 +211,19 @@ bool checkCloud(const sensor_msgs::PointCloud2& cloud_msg,
   T search_point;
   Eigen::Matrix3f ev = pca.getEigenVectors();
   Eigen::Vector3f main_axis(ev.coeff(0, 0), ev.coeff(1, 0), ev.coeff(2, 0));
-
-  main_axis = (-main_axis.normalized() * 0.3) + Eigen::Vector3f(mean.coeff(0), mean.coeff(1), mean.coeff(2));
-  search_point.x = main_axis.coeff(0);
-  search_point.y = main_axis.coeff(1);
-  search_point.z = main_axis.coeff(2);
   main_axis.normalize();
-
-
-  arm_position.setX(mean.coeff(0));
-  arm_position.setY(mean.coeff(1));
-  arm_position.setZ(mean.coeff(2));
   arm_direction.setX(main_axis.coeff(0));
   arm_direction.setY(main_axis.coeff(1));
   arm_direction.setZ(main_axis.coeff(2));
+  arm_position.setX(mean.coeff(0));
+  arm_position.setY(mean.coeff(1));
+  arm_position.setZ(mean.coeff(2));
+
+  main_axis = (-main_axis * 0.3) + Eigen::Vector3f(mean.coeff(0), mean.coeff(1), mean.coeff(2));
+  search_point.x = main_axis.coeff(0);
+  search_point.y = main_axis.coeff(1);
+  search_point.z = main_axis.coeff(2);
+
 
 
   //find hand
@@ -326,7 +325,7 @@ bool checkCloud(const sensor_msgs::PointCloud2& cloud_msg,
   return true;
 }
 
-int closestHand(const tf::Vector3& point, const std::vector<tf::Vector3>& hand_positions)
+int closestPoint(const tf::Vector3& point, const std::vector<tf::Vector3>& hand_positions)
 {
   double dist, min_distant = 1e6;
   size_t index = 0;
@@ -345,6 +344,24 @@ int closestHand(const tf::Vector3& point, const std::vector<tf::Vector3>& hand_p
   return index;
 }
 
+int farthestPoint(const tf::Vector3& point, const std::vector<tf::Vector3>& hand_positions)
+{
+  double dist, max_distant = 0;
+  size_t index = 0;
+  for (size_t i = 0; i < hand_positions.size(); i++)
+  {
+    tf::Vector3 point2(hand_positions[i].x(),
+                       hand_positions[i].y(),
+                       hand_positions[i].z());
+    dist = point.distance(point2);
+    if (dist > max_distant)
+    {
+      max_distant = dist;
+      index = i;
+    }
+  }
+  return index;
+}
 
 void callbackClusteredClouds(const clustered_clouds_msgs::ClusteredCloudsConstPtr& msg)
 {
@@ -395,105 +412,112 @@ void callbackClusteredClouds(const clustered_clouds_msgs::ClusteredCloudsConstPt
   }
   mutex_config.unlock();
 
-  if(hand_positions.size() != g_hand_trackers.size())
+
+
+  if(hand_positions.size() > g_hand_trackers.size())
   {
-    g_hand_trackers.clear();
-    g_hand_histories.resize(hand_positions.size());
-    for (size_t i = 0; i < hand_positions.size(); i++)
+    std::vector<tf::Vector3> hand_positions_tmp = hand_positions;
+    cv::Mat result;
+    for (size_t i = 0; i < g_hand_trackers.size(); i++)
+    {
+      result = g_hand_trackers[i].lastResult();
+      tf::Vector3 point1(result.at<float>(0), result.at<float>(1), result.at<float>(2));
+      int index = closestPoint(point1, hand_positions_tmp);
+      //remove
+      hand_positions_tmp.erase(hand_positions_tmp.begin() + index);
+    }
+
+    //add new tracker
+    for(size_t i = 0; i < hand_positions_tmp.size(); i++)
     {
       KalmanFilter3d tracker;
-      cv::Point3f point(hand_positions[i].x(),
-                        hand_positions[i].y(),
-                        hand_positions[i].z());
+      cv::Point3f point(hand_positions_tmp[i].x(),
+                        hand_positions_tmp[i].y(),
+                        hand_positions_tmp[i].z());
       tracker.initialize(1.0 / 30.0, point, 1e-2, 1e-1, 1e-1);
       g_hand_trackers.push_back(tracker);
     }
+    g_hand_histories.resize(g_hand_trackers.size());
   }
 
   geometry_msgs::Point marker_point;
   cv::Point3f measurement;
   cv::Mat result;
-  int state;  
   interaction_msgs::Arms arms_msg;
   for (size_t i = 0; i < g_hand_trackers.size(); i++)
   {
-    if (i + 1 <= hand_positions.size())
+    g_hand_trackers[i].predict(result);
+
+    //prepare markers if needed
+    if(g_marker_array_pub.getNumSubscribers() != 0)
     {
-      g_hand_trackers[i].predict(result);
-      //ROS_INFO_STREAM("[" << i << "] predicted: " << result);
+      marker_point.x = result.at<float>(0);
+      marker_point.y = result.at<float>(1);
+      marker_point.z = result.at<float>(2);
+    }
 
-      //prepare markers if needed
-      if(g_marker_array_pub.getNumSubscribers() != 0)
-      {
-        marker_point.x = result.at<float>(0);
-        marker_point.y = result.at<float>(1);
-        marker_point.z = result.at<float>(2);
-      }
-
+    if(hand_positions.size() > 0)
+    {
       tf::Vector3 point1(result.at<float>(0), result.at<float>(1), result.at<float>(2));
-      int index = closestHand(point1, hand_positions);
-      state = g_hand_trackers[i].getState();
+      int index = closestPoint(point1, hand_positions);
 
-      switch (state)
-      {
-        case KalmanFilter3d::START:
-        case KalmanFilter3d::TRACK:
-        case KalmanFilter3d::LOST:
-        {
-          //ROS_INFO("%d TRACK", i);
-          measurement.x = hand_positions[index].x();
-          measurement.y = hand_positions[index].y();
-          measurement.z = hand_positions[index].z();
-          break;
-        }
-        case KalmanFilter3d::DIE:
-          //ROS_INFO("%d DIE", i);
-          cv::Point3f point(hand_positions[index].x(),
-                            hand_positions[index].y(),
-                            hand_positions[index].z());
-          //ROS_INFO_STREAM("[" << i << "] point: " << point);
-          g_hand_trackers[i].initialize(1.0 / 30.0, point, 1e-2, 1e-1, 1e-1);
-          break;
-      }                  
 
-      if ((state == KalmanFilter3d::TRACK) || (state == KalmanFilter3d::START))
-      {
-        g_hand_trackers[i].update(measurement, result);
+      //ROS_INFO("%d TRACK", i);
+      measurement.x = hand_positions[index].x();
+      measurement.y = hand_positions[index].y();
+      measurement.z = hand_positions[index].z();
 
-        interaction_msgs::Arm arm_msg;
-        arm_msg.arm_id = i;
-        arm_msg.hand.translation.x = result.at<float>(0);
-        arm_msg.hand.translation.y = result.at<float>(1);
-        arm_msg.hand.translation.z = result.at<float>(2);
-        arm_msg.hand.rotation.w = 1;
-        arms_msg.arms.push_back(arm_msg);
+
+      g_hand_trackers[i].update(measurement, result);
+      hand_positions.erase(hand_positions.begin() + index);
+    }
+
+    interaction_msgs::Arm arm_msg;
+    arm_msg.arm_id = g_hand_trackers[i].id();
+    arm_msg.hand.translation.x = result.at<float>(0);
+    arm_msg.hand.translation.y = result.at<float>(1);
+    arm_msg.hand.translation.z = result.at<float>(2);
+    arm_msg.hand.rotation.w = 1;
+    arms_msg.arms.push_back(arm_msg);
 
 
 #if PUBLISH_TRANSFORM
-        tf::Transform hand_tf;
-        hand_tf.setOrigin(tf::Vector3(result.at<float>(0), result.at<float>(1), result.at<float>(2)));
-        hand_tf.setRotation(tf::Quaternion(0, 0, 0, 1));
+    tf::Transform hand_tf;
+    hand_tf.setOrigin(tf::Vector3(result.at<float>(0), result.at<float>(1), result.at<float>(2)));
 
-        std::stringstream ss;
-        ss << "hand" << i;
+    /*index
+    Eigen::Quaternionf q;
+    q.setFromTwoVectors(Eigen::Vector3f(1, 0, 0),
+                        Eigen::Vector3f(arm_directions[index].x(), arm_directions[index].y(), arm_directions[index].z()));
+    tf::Quaternion q_tf(q.x(), q.y(), q.z(), q.w());
+    tf::Quaternion q_rotate;
+    q_rotate.setEuler(0, 0, M_PI);
+    hand_tf.setRotation(q_tf * q_rotate);
+    */
+    hand_tf.setRotation(tf::Quaternion(0, 0, 0, 1));
 
-        tf_br.sendTransform(tf::StampedTransform(hand_tf, ros::Time::now(), msg->header.frame_id, ss.str()));
+    std::stringstream ss;
+    ss << "hand" << g_hand_trackers[i].id();
+
+    tf_br.sendTransform(tf::StampedTransform(hand_tf, ros::Time::now(), msg->header.frame_id, ss.str()));
 #endif
+    g_hand_trackers[i].updateState();
 
-        //prepare markers if needed
-        if(g_marker_array_pub.getNumSubscribers() != 0)
-        {
-          marker_point.x = result.at<float>(0);
-          marker_point.y = result.at<float>(1);
-          marker_point.z = result.at<float>(2);
-          g_hand_histories[i].push_back(marker_point);
 
-          if (g_hand_histories[i].size() > HAND_HISTORY_SIZE)
-          {
-            g_hand_histories[i].pop_front();
-          }
-        }
-      }
+  }
+
+  //remove dead tracker
+  std::vector<KalmanFilter3d>::iterator it = g_hand_trackers.begin();
+  while(it != g_hand_trackers.end())
+  {
+    if(it->getState() == KalmanFilter3d::DIE)
+    {
+      ROS_DEBUG("remove tracker %d", it->id());
+      it = g_hand_trackers.erase(it);
+    }
+    else
+    {
+      it++;
     }
   }
 

@@ -60,20 +60,29 @@ public:
   ~KalmanFilter3d();
 
   void initialize(double dt,
-                    const cv::Point3f& point,
-                    double process_noise = 1e-4,
-                    double measurement_noise = 1e-1,
-                    double error_cov = 1e-1);
+                  const cv::Point3f& point,
+                  double process_noise = 1e-4,
+                  double measurement_noise = 1e-1,
+                  double error_cov = 1e-1,
+                  int update_before_track = 5,
+                  int predict_before_die = 10);
   void predict(cv::Mat& result);
   void update(const cv::Point3f& measurement, cv::Mat& result);
+  cv::Mat lastResult() { return last_result_; }
   int updateState();
   int getState() { return current_state_; }
+  int id() { return id_; }
 
 protected:
   cv::KalmanFilter filter_;
+  static int id_count_;
+  int id_;
   int predict_count_;
   int update_count_;
   int current_state_;
+  int update_before_track_;
+  int predict_before_die_;
+  cv::Mat last_result_;
 };
 
 
