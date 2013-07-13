@@ -328,11 +328,8 @@ int closestPoint(const tf::Vector3& point, const std::vector<tf::Vector3>& hand_
   double dist, min_distant = 1e6;
   size_t index = 0;
   for (size_t i = 0; i < hand_positions.size(); i++)
-  {
-    tf::Vector3 point2(hand_positions[i].x(),
-                       hand_positions[i].y(),
-                       hand_positions[i].z());
-    dist = point.distance(point2);
+  {    
+    dist = point.distance(hand_positions[i]);
     if (dist < min_distant)
     {
       min_distant = dist;
@@ -348,10 +345,7 @@ int farthestPoint(const tf::Vector3& point, const std::vector<tf::Vector3>& hand
   size_t index = 0;
   for (size_t i = 0; i < hand_positions.size(); i++)
   {
-    tf::Vector3 point2(hand_positions[i].x(),
-                       hand_positions[i].y(),
-                       hand_positions[i].z());
-    dist = point.distance(point2);
+    dist = point.distance(hand_positions[i]);
     if (dist > max_distant)
     {
       max_distant = dist;
@@ -437,77 +431,74 @@ void callbackClusteredClouds(const clustered_clouds_msgs::ClusteredCloudsConstPt
       t.first = tracker;
       g_hand_trackers.push_back(t);
     }
-
   }
 
-  cv::Point3f measurement;
   cv::Mat result;
-  interaction_msgs::Arms arms_msg;
+  std::vector<tf::Vector3> results;
+  interaction_msgs::ArmsPtr arms_msg(new interaction_msgs::Arms);
+  arms_msg->arms.resize(g_hand_trackers.size());
   for (size_t i = 0; i < g_hand_trackers.size(); i++)
   {
     g_hand_trackers[i].first.predict(result);
+    results.push_back(tf::Vector3(result.at<float>(0), result.at<float>(1), result.at<float>(2)));
+    arms_msg->arms[i].hand.rotation.w = 1;
+  }
 
-    int index = -1;
-    if(hand_positions.size() > 0)
-    {
-      tf::Vector3 point1(result.at<float>(0), result.at<float>(1), result.at<float>(2));
-      index = closestPoint(point1, hand_positions);
+  int index;
+  cv::Point3f measurement;
+  tf::Quaternion q_hand;
+  Eigen::Quaternionf q;
+  tf::Quaternion q_rotate;
+  q_rotate.setEuler(0, 0, M_PI);
+  for(size_t i = 0; i < hand_positions.size(); i++)
+  {
+    index = closestPoint(hand_positions[i], results);
+    measurement.x = hand_positions[i].x();
+    measurement.y = hand_positions[i].y();
+    measurement.z = hand_positions[i].z();
+    g_hand_trackers[index].first.update(measurement, result);
+    results[index] = tf::Vector3(result.at<float>(0), result.at<float>(1), result.at<float>(2));
 
-      measurement.x = hand_positions[index].x();
-      measurement.y = hand_positions[index].y();
-      measurement.z = hand_positions[index].z();
+    q.setFromTwoVectors(Eigen::Vector3f(1, 0, 0),
+                        Eigen::Vector3f(arm_directions[i].x(), arm_directions[i].y(), arm_directions[i].z()));
+    tf::Quaternion q_tf(q.x(), q.y(), q.z(), q.w());
+    q_hand = q_tf * q_rotate;
+    arms_msg->arms[index].hand.rotation.x = q_hand.x();
+    arms_msg->arms[index].hand.rotation.y = q_hand.y();
+    arms_msg->arms[index].hand.rotation.z = q_hand.z();
+    arms_msg->arms[index].hand.rotation.w = q_hand.w();
+  }
 
-      g_hand_trackers[i].first.update(measurement, result);
-      hand_positions.erase(hand_positions.begin() + index);
-    }
-
-    interaction_msgs::Arm arm_msg;
-    arm_msg.arm_id = g_hand_trackers[i].first.id();
-    arm_msg.hand.translation.x = result.at<float>(0);
-    arm_msg.hand.translation.y = result.at<float>(1);
-    arm_msg.hand.translation.z = result.at<float>(2);
-
-    tf::Quaternion q_hand;
-    if(index != -1)
-    {
-      Eigen::Quaternionf q;
-      q.setFromTwoVectors(Eigen::Vector3f(1, 0, 0),
-                          Eigen::Vector3f(arm_directions[index].x(), arm_directions[index].y(), arm_directions[index].z()));
-      tf::Quaternion q_tf(q.x(), q.y(), q.z(), q.w());
-      tf::Quaternion q_rotate;
-      q_rotate.setEuler(0, 0, M_PI);
-      q_hand = q_tf * q_rotate;
-      arm_msg.hand.rotation.x = q_hand.x();
-      arm_msg.hand.rotation.y = q_hand.y();
-      arm_msg.hand.rotation.z = q_hand.z();
-      arm_msg.hand.rotation.w = q_hand.w();
-    }
-    else
-    {
-      arm_msg.hand.rotation.w = 1;
-    }
-    arms_msg.arms.push_back(arm_msg);
+  for(size_t i = 0; i < results.size(); i++)
+  {
+    g_hand_trackers[i].first.updateState();
+    arms_msg->arms[i].arm_id = g_hand_trackers[i].first.id();
+    arms_msg->arms[i].hand.translation.x = results[i].x();
+    arms_msg->arms[i].hand.translation.y = results[i].y();
+    arms_msg->arms[i].hand.translation.z = results[i].z();
 
     //prepare markers if needed
     if(g_marker_array_pub.getNumSubscribers() != 0)
     {
       geometry_msgs::Point marker_point;
-      marker_point.x = result.at<float>(0);
-      marker_point.y = result.at<float>(1);
-      marker_point.z = result.at<float>(2);
+      marker_point.x = results[i].x();
+      marker_point.y = results[i].y();
+      marker_point.z = results[i].z();
       g_hand_trackers[i].second.push_back(marker_point);
       if(g_hand_trackers[i].second.size() > HAND_HISTORY_SIZE)
         g_hand_trackers[i].second.pop_front();
     }
 
-
 #if PUBLISH_TRANSFORM
     tf::Transform hand_tf;
-    hand_tf.setOrigin(tf::Vector3(result.at<float>(0), result.at<float>(1), result.at<float>(2)));
+    hand_tf.setOrigin(results[i]);
 
     if(index != -1)
     {
-      hand_tf.setRotation(q_hand);
+      hand_tf.setRotation(tf::Quaternion(arms_msg->arms[i].hand.rotation.x,
+                                         arms_msg->arms[i].hand.rotation.y,
+                                         arms_msg->arms[i].hand.rotation.z,
+                                         arms_msg->arms[i].hand.rotation.w));
     }
     else
     {
@@ -519,8 +510,6 @@ void callbackClusteredClouds(const clustered_clouds_msgs::ClusteredCloudsConstPt
 
     tf_br.sendTransform(tf::StampedTransform(hand_tf, ros::Time::now(), msg->header.frame_id, ss.str()));
 #endif
-    g_hand_trackers[i].first.updateState();
-
 
   }
 
@@ -577,10 +566,10 @@ void callbackClusteredClouds(const clustered_clouds_msgs::ClusteredCloudsConstPt
   }
 
 
-  if((g_arms_pub.getNumSubscribers() != 0) && arms_msg.arms.size() != 0)
+  if(g_arms_pub.getNumSubscribers() != 0)
   {
-    arms_msg.header.stamp = ros::Time::now();
-    arms_msg.header.frame_id = msg->header.frame_id;
+    arms_msg->header.stamp = ros::Time::now();
+    arms_msg->header.frame_id = msg->header.frame_id;
     g_arms_pub.publish(arms_msg);
   }
 

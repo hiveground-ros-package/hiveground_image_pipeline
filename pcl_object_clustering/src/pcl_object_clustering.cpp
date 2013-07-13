@@ -171,20 +171,20 @@ void callbackCloud(const sensor_msgs::PointCloud2ConstPtr& msg)
     cloud_with_rgb_data = true;
   }
 
-  clustered_clouds_msgs::ClusteredClouds msg_out;
+  clustered_clouds_msgs::ClusteredCloudsPtr msg_out(new clustered_clouds_msgs::ClusteredClouds);
   if(cloud_with_rgb_data)
   {
-    processCloud<pcl::PointXYZRGB>(msg, msg_out);
+    processCloud<pcl::PointXYZRGB>(msg, *msg_out);
   }
   else
   {
-    processCloud<pcl::PointXYZ>(msg, msg_out);
+    processCloud<pcl::PointXYZ>(msg, *msg_out);
   }
 
-  if(g_clustered_clouds_pub.getNumSubscribers() != 0 && msg_out.clouds.size() != 0)
+  if(g_clustered_clouds_pub.getNumSubscribers() != 0 && msg_out->clouds.size() != 0)
   {
-    msg_out.header.stamp = ros::Time::now();
-    msg_out.header.frame_id = msg->header.frame_id;
+    msg_out->header.stamp = ros::Time::now();
+    msg_out->header.frame_id = msg->header.frame_id;
     g_clustered_clouds_pub.publish(msg_out);
   }
 }
