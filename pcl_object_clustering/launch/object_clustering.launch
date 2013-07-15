@@ -1,5 +1,5 @@
 <launch>
   <node type="pcl_object_clustering" pkg="pcl_object_clustering" name="pcl_object_clustering" output="screen">      
-    <remap from="cloud_in" to="/kinect_top/self_filtered_output" />    
+    <remap from="cloud_in" to="/kinect_top/self_filtered_output_transformed" />    
   </node>
 </launch>

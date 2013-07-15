@@ -108,7 +108,6 @@ int KalmanFilter3d::updateState()
   switch(current_state_)
   {
     case START:
-      ROS_DEBUG("START %d %d %d", id_, predict_count_, update_count_);
       if(predict_count_ > update_count_)
       {
         current_state_ = DIE;
@@ -122,11 +121,11 @@ int KalmanFilter3d::updateState()
       }
       else
       {
-        ROS_ERROR("Should not happen! call predict before update!");
+        ROS_INFO("START %d %d %d", id_, predict_count_, update_count_);
+        ROS_ERROR("This should not happen! call predict before update!");
       }
       break;
     case TRACK:
-      ROS_DEBUG("TRACK %d %d %d", id_, predict_count_, update_count_);
       if(predict_count_ > update_count_)
       {
         current_state_ = LOST;
@@ -138,7 +137,8 @@ int KalmanFilter3d::updateState()
       }
       else
       {
-        ROS_ERROR("Should not happen! call predict before update!");
+        ROS_INFO("TRACK %d %d %d", id_, predict_count_, update_count_);
+        ROS_ERROR("This should not happen! call predict before update!");
       }
       break;
     case LOST:

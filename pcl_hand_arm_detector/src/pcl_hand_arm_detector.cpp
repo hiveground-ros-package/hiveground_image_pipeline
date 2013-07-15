@@ -450,9 +450,13 @@ void callbackClusteredClouds(const clustered_clouds_msgs::ClusteredCloudsConstPt
   Eigen::Quaternionf q;
   tf::Quaternion q_rotate;
   q_rotate.setEuler(0, 0, M_PI);
+  int last_index = -1;
   for(size_t i = 0; i < hand_positions.size(); i++)
   {
     index = closestPoint(hand_positions[i], results);
+    if(last_index == index)
+      continue;
+    last_index = index;
     measurement.x = hand_positions[i].x();
     measurement.y = hand_positions[i].y();
     measurement.z = hand_positions[i].z();
